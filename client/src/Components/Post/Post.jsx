@@ -29,7 +29,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { restoreUser } from "../../Redux/UserSlice/UserSlice";
 
-const API_URL = "http://localhost:4000/api/posts";
+const API_URL = "https://law-link-bd-api.vercel.app/api/posts";
 
 const categoryOptions = [
   "All",

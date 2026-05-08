@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
-const API_BASE_URL = "http://localhost:4000/api";
+const API_BASE_URL = "https://law-link-bd-api.vercel.app/api";
 
 const POST_STATUSES = ["open", "in_progress", "closed", "cancelled"];
 

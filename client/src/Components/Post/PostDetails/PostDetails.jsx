@@ -29,8 +29,8 @@ import {
 } from "lucide-react";
 import { restoreUser } from "../../../Redux/UserSlice/UserSlice";
 
-const POSTS_API_URL = "http://localhost:4000/api/posts";
-const CONNECTIONS_API_URL = "http://localhost:4000/api/connections";
+const POSTS_API_URL = "https://law-link-bd-api.vercel.app/api/posts";
+const CONNECTIONS_API_URL = "https://law-link-bd-api.vercel.app/api/connections";
 
 const getStoredToken = () => {
   return localStorage.getItem("token") || sessionStorage.getItem("token");

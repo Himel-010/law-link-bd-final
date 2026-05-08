@@ -18,7 +18,7 @@ import {
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_BASE_URL = "http://localhost:4000/api";
+const API_BASE_URL = "https://law-link-bd-api.vercel.app/api";
 const PAYMENT_METHODS = ["bkash", "nogod"];
 
 const initialForm = {

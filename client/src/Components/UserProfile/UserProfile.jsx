@@ -39,7 +39,7 @@ import {
 } from "react-icons/md";
 import { RiProfileLine } from "react-icons/ri";
 
-const API_BASE_URL = "http://localhost:4000/api";
+const API_BASE_URL = "https://law-link-bd-api.vercel.app/api";
 
 const GOOGLE_DRIVE_HOSTS = ["drive.google.com"];
 

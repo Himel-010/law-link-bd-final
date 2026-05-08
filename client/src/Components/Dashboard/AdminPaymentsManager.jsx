@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
-const API_BASE = "http://localhost:4000/api/payments";
+const API_BASE = "https://law-link-bd-api.vercel.app/api/payments";
 
 const paymentStatusOptions = ["all", "pending", "verified", "rejected", "refunded"];
 const methodOptions = ["all", "bkash", "nogod"];

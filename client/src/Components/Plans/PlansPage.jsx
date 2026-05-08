@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSelector } from "react-redux";
 import i18n from "../../json/plans.json";
 
-const API_BASE_URL = "http://localhost:4000/api";
+const API_BASE_URL = "https://law-link-bd-api.vercel.app/api";
 
 const PAYMENT_METHODS = ["bkash", "nogod"];
 
