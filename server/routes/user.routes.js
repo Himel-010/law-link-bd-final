@@ -10,6 +10,7 @@ import {
   getUsersDropdown,
   updateUser,
   deleteUser,
+  verifyLawyer,
 } from "../controllers/user.controller.js";
 
 import { protect, adminOnly } from "../middleware/auth.js";
@@ -44,6 +45,18 @@ router.get("/dropdown", protect, adminOnly, getUsersDropdown);
 // Get all users with cursor pagination
 // Example: /api/users?limit=20&role=client&search=rahim
 router.get("/", protect, adminOnly, getAllUsers);
+
+// Admin verify / reject lawyer
+// Body example:
+// {
+//   "status": "verified"
+// }
+// or
+// {
+//   "status": "rejected",
+//   "reason": "Invalid BAR registration number"
+// }
+router.patch("/lawyers/:id/verify", protect, adminOnly, verifyLawyer);
 
 // Update user
 router.put("/:id", protect, adminOnly, updateUser);

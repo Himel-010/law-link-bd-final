@@ -30,9 +30,7 @@ const decodeCursor = (cursor) => {
   if (!cursor) return null;
 
   try {
-    const parsed = JSON.parse(
-      Buffer.from(cursor, "base64url").toString("utf8")
-    );
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
 
     if (!parsed?.createdAt || !parsed?.id || !isValidObjectId(parsed.id)) {
       return null;
@@ -70,7 +68,7 @@ const getCursorFilter = (cursor) => {
 };
 
 const buildUserFilter = (query = {}) => {
-  const { role, search, subscriptionStatus } = query;
+  const { role, search, subscriptionStatus, lawyerVerificationStatus } = query;
 
   const filter = {};
 
@@ -80,6 +78,10 @@ const buildUserFilter = (query = {}) => {
 
   if (subscriptionStatus && subscriptionStatus !== "all") {
     filter.subscriptionStatus = subscriptionStatus;
+  }
+
+  if (lawyerVerificationStatus && lawyerVerificationStatus !== "all") {
+    filter.lawyerVerificationStatus = lawyerVerificationStatus;
   }
 
   if (search?.trim()) {
@@ -105,6 +107,10 @@ const getSafeUserData = (user) => ({
   lawRegNumber: user.lawRegNumber || null,
   phoneVerified: user.phoneVerified || 0,
   role: user.role,
+  lawyerVerificationStatus: user.lawyerVerificationStatus,
+  lawyerVerifiedAt: user.lawyerVerifiedAt || null,
+  lawyerVerifiedBy: user.lawyerVerifiedBy || null,
+  lawyerRejectionReason: user.lawyerRejectionReason || "",
   subscriptionStatus: user.subscriptionStatus,
   currentSubscription: user.currentSubscription,
 });
@@ -135,7 +141,7 @@ export const registerClient = async (req, res) => {
     }
 
     const existingUser = await User.findOne({
-      email: email.toLowerCase(),
+      email: email.toLowerCase().trim(),
     });
 
     if (existingUser) {
@@ -153,6 +159,7 @@ export const registerClient = async (req, res) => {
       phone: phone.trim(),
       password: hashedPassword,
       role: "client",
+      lawyerVerificationStatus: "not_required",
     });
 
     await assignFreeSubscriptionToUser(user);
@@ -195,7 +202,7 @@ export const registerLawyer = async (req, res) => {
     }
 
     const existingUser = await User.findOne({
-      email: email.toLowerCase(),
+      email: email.toLowerCase().trim(),
     });
 
     if (existingUser) {
@@ -216,24 +223,20 @@ export const registerLawyer = async (req, res) => {
       phoneVerified: Number(phoneVerified) === 1 ? 1 : 0,
       password: hashedPassword,
       role: "lawyer",
+      lawyerVerificationStatus: "pending",
+      lawyerVerifiedAt: null,
+      lawyerVerifiedBy: null,
+      lawyerRejectionReason: "",
     });
 
-    await assignFreeSubscriptionToUser(user);
-
-    const finalUser = await User.findById(user._id)
-      .select("-password")
-      .populate(
-        "currentSubscription",
-        "planName planSlug roleType status startDate endDate price currency features"
-      );
-
-    const token = generateToken(finalUser);
+    const finalUser = await User.findById(user._id).select("-password");
 
     return res.status(201).json({
       success: true,
-      message: "Lawyer registered successfully. Free plan activated.",
+      message:
+        "Lawyer registered successfully. Your account is pending admin verification. You can login after admin approval.",
       user: getSafeUserData(finalUser),
-      token,
+      token: null,
     });
   } catch (err) {
     return res.status(500).json({
@@ -256,7 +259,7 @@ export const registerAdmin = async (req, res) => {
     }
 
     const existingUser = await User.findOne({
-      email: email.toLowerCase(),
+      email: email.toLowerCase().trim(),
     });
 
     if (existingUser) {
@@ -274,6 +277,7 @@ export const registerAdmin = async (req, res) => {
       phone: phone?.trim() || "",
       password: hashedPassword,
       role: "admin",
+      lawyerVerificationStatus: "not_required",
     });
 
     const token = generateToken(user);
@@ -305,7 +309,7 @@ export const loginUser = async (req, res) => {
     }
 
     let user = await User.findOne({
-      email: email.toLowerCase(),
+      email: email.toLowerCase().trim(),
     });
 
     if (!user) {
@@ -324,7 +328,39 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    if (["client", "lawyer"].includes(user.role) && user.subscriptionStatus === "none") {
+    if (user.role === "lawyer") {
+      if (user.lawyerVerificationStatus === "pending") {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Your lawyer account is pending admin verification. You can login after admin approval.",
+          verificationStatus: "pending",
+        });
+      }
+
+      if (user.lawyerVerificationStatus === "rejected") {
+        return res.status(403).json({
+          success: false,
+          message:
+            user.lawyerRejectionReason ||
+            "Your lawyer account verification was rejected by admin.",
+          verificationStatus: "rejected",
+        });
+      }
+
+      if (user.lawyerVerificationStatus !== "verified") {
+        return res.status(403).json({
+          success: false,
+          message: "Your lawyer account is not verified yet.",
+          verificationStatus: user.lawyerVerificationStatus,
+        });
+      }
+    }
+
+    if (
+      ["client", "lawyer"].includes(user.role) &&
+      user.subscriptionStatus === "none"
+    ) {
       await assignFreeSubscriptionToUser(user);
     }
 
@@ -352,6 +388,93 @@ export const loginUser = async (req, res) => {
   }
 };
 
+export const verifyLawyer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reason = "" } = req.body;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid lawyer id",
+      });
+    }
+
+    if (!["verified", "rejected", "pending"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be verified, rejected, or pending",
+      });
+    }
+
+    const lawyer = await User.findById(id);
+
+    if (!lawyer) {
+      return res.status(404).json({
+        success: false,
+        message: "Lawyer not found",
+      });
+    }
+
+    if (lawyer.role !== "lawyer") {
+      return res.status(400).json({
+        success: false,
+        message: "This user is not a lawyer",
+      });
+    }
+
+    lawyer.lawyerVerificationStatus = status;
+
+    if (status === "verified") {
+      lawyer.lawyerVerifiedAt = new Date();
+      lawyer.lawyerVerifiedBy = req.user?.id || null;
+      lawyer.lawyerRejectionReason = "";
+
+      if (lawyer.subscriptionStatus === "none") {
+        await assignFreeSubscriptionToUser(lawyer);
+      }
+    }
+
+    if (status === "rejected") {
+      lawyer.lawyerVerifiedAt = null;
+      lawyer.lawyerVerifiedBy = null;
+      lawyer.lawyerRejectionReason = reason.trim();
+    }
+
+    if (status === "pending") {
+      lawyer.lawyerVerifiedAt = null;
+      lawyer.lawyerVerifiedBy = null;
+      lawyer.lawyerRejectionReason = "";
+    }
+
+    await lawyer.save();
+
+    const updatedLawyer = await User.findById(lawyer._id)
+      .select("-password")
+      .populate(
+        "currentSubscription",
+        "planName planSlug roleType status startDate endDate price currency features"
+      );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        status === "verified"
+          ? "Lawyer verified successfully. Lawyer can login now."
+          : status === "rejected"
+          ? "Lawyer verification rejected successfully."
+          : "Lawyer verification status set to pending.",
+      data: updatedLawyer,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update lawyer verification status",
+      error: err.message,
+    });
+  }
+};
+
 export const getPublicLawyers = async (req, res) => {
   try {
     const {
@@ -366,6 +489,7 @@ export const getPublicLawyers = async (req, res) => {
 
     const filter = {
       role: "lawyer",
+      lawyerVerificationStatus: "verified",
     };
 
     if (subscriptionStatus && subscriptionStatus !== "all") {
@@ -394,7 +518,7 @@ export const getPublicLawyers = async (req, res) => {
 
     const lawyers = await User.find(finalFilter)
       .select(
-        "name email phone role lawRegNumber phoneVerified subscriptionStatus currentSubscription createdAt"
+        "name email phone role lawRegNumber phoneVerified lawyerVerificationStatus subscriptionStatus currentSubscription createdAt"
       )
       .populate({
         path: "currentSubscription",
@@ -505,7 +629,7 @@ export const getUsersDropdown = async (req, res) => {
       : filter;
 
     const users = await User.find(finalFilter)
-      .select("name email phone role createdAt")
+      .select("name email phone role lawyerVerificationStatus createdAt")
       .sort({
         createdAt: -1,
         _id: -1,
@@ -552,6 +676,8 @@ export const updateUser = async (req, res) => {
     delete updateData._id;
     delete updateData.createdAt;
     delete updateData.updatedAt;
+    delete updateData.lawyerVerifiedAt;
+    delete updateData.lawyerVerifiedBy;
 
     if (updateData.email) {
       updateData.email = updateData.email.toLowerCase().trim();
@@ -571,8 +697,22 @@ export const updateUser = async (req, res) => {
 
     if (updateData.name) updateData.name = updateData.name.trim();
     if (updateData.phone) updateData.phone = updateData.phone.trim();
+    if (updateData.nid) updateData.nid = updateData.nid.trim();
+    if (updateData.lawRegNumber) {
+      updateData.lawRegNumber = updateData.lawRegNumber.trim();
+    }
+
     if (updateData.password) {
       updateData.password = await bcrypt.hash(updateData.password, 10);
+    }
+
+    if (updateData.role && updateData.role !== "lawyer") {
+      updateData.lawyerVerificationStatus = "not_required";
+      updateData.lawyerRejectionReason = "";
+    }
+
+    if (updateData.role === "lawyer" && !updateData.lawyerVerificationStatus) {
+      updateData.lawyerVerificationStatus = "pending";
     }
 
     const updatedUser = await User.findByIdAndUpdate(id, updateData, {

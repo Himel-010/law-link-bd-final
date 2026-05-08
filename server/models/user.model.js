@@ -57,6 +57,31 @@ const userSchema = new mongoose.Schema(
       default: "client",
     },
 
+    lawyerVerificationStatus: {
+      type: String,
+      enum: ["not_required", "pending", "verified", "rejected"],
+      default: function () {
+        return this.role === "lawyer" ? "pending" : "not_required";
+      },
+    },
+
+    lawyerVerifiedAt: {
+      type: Date,
+      default: null,
+    },
+
+    lawyerVerifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    lawyerRejectionReason: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     subscriptionStatus: {
       type: String,
       enum: ["none", "pending", "active", "expired", "cancelled"],
