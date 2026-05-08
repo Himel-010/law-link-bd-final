@@ -17,6 +17,7 @@ import {
   Clock,
   ShieldCheck,
   X,
+  CheckCircle2,
 } from "lucide-react"
 import { useSelector } from "react-redux"
 import data from "../../json/signup.json"
@@ -31,7 +32,7 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
-  const [showLawyerPendingModal, setShowLawyerPendingModal] = useState(false)
+  const [showVerificationModal, setShowVerificationModal] = useState(false)
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -72,23 +73,22 @@ const SignUp = () => {
   const creatingAccountText =
     lang === "bn" ? "একাউন্ট তৈরি হচ্ছে..." : "Creating Account..."
 
-  const lawyerPendingTitle =
+  const modalTitle =
     lang === "bn"
-      ? "আপনার আইনজীবী একাউন্ট তৈরি হয়েছে"
-      : "Your lawyer account has been created"
+      ? "Account Creation Under Verification"
+      : "Account Creation Under Verification"
 
-  const lawyerPendingDesc =
+  const modalDescription =
     lang === "bn"
-      ? "আপনার একাউন্টটি এখন admin verification এর জন্য pending আছে। Admin verify করার পর আপনি login করতে পারবেন।"
-      : "Your account is now pending admin verification. You can login after the admin verifies your lawyer account."
+      ? "আপনার আইনজীবী একাউন্ট সফলভাবে তৈরি হয়েছে। তবে একাউন্টটি এখন admin verification এর অধীনে আছে। Admin verify করার পর আপনি login করতে পারবেন।"
+      : "Your lawyer account has been created successfully. However, your account is now under admin verification. You can login after the admin verifies your account."
 
-  const lawyerPendingNote =
+  const modalNotice =
     lang === "bn"
-      ? "অনুগ্রহ করে verification শেষ হওয়া পর্যন্ত অপেক্ষা করুন।"
-      : "Please wait until the verification is completed."
+      ? "Verification শেষ হওয়া পর্যন্ত অনুগ্রহ করে অপেক্ষা করুন।"
+      : "Please wait until the verification process is completed."
 
   const goToLoginText = lang === "bn" ? "Sign In পেজে যান" : "Go to Sign In"
-
   const closeText = lang === "bn" ? "বন্ধ করুন" : "Close"
 
   const resetForm = () => {
@@ -106,8 +106,8 @@ const SignUp = () => {
     })
   }
 
-  const handleLawyerModalLogin = () => {
-    setShowLawyerPendingModal(false)
+  const handleGoToLogin = () => {
+    setShowVerificationModal(false)
     navigate("/sign-in")
   }
 
@@ -177,16 +177,20 @@ const SignUp = () => {
         return
       }
 
+      const registeredUserType = formData.userType
+
       resetForm()
 
-      if (formData.userType === "lawyer") {
-        setShowLawyerPendingModal(true)
+      if (registeredUserType === "lawyer") {
+        setShowVerificationModal(true)
         return
       }
 
       setSuccessMessage(
         result.message ||
-          (lang === "bn" ? "রেজিস্ট্রেশন সফল হয়েছে" : "Registration successful")
+          (lang === "bn"
+            ? "রেজিস্ট্রেশন সফল হয়েছে"
+            : "Registration successful")
       )
 
       setTimeout(() => {
@@ -214,7 +218,7 @@ const SignUp = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-amber-50 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
       <AnimatePresence>
-        {showLawyerPendingModal && (
+        {showVerificationModal && (
           <motion.div
             className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
             initial={{ opacity: 0 }}
@@ -231,7 +235,7 @@ const SignUp = () => {
               <div className="relative bg-gradient-to-br from-cyan-600 to-cyan-700 px-6 py-8 text-center text-white">
                 <button
                   type="button"
-                  onClick={() => setShowLawyerPendingModal(false)}
+                  onClick={() => setShowVerificationModal(false)}
                   className="absolute right-4 top-4 rounded-full bg-white/15 p-2 text-white transition hover:bg-white/25"
                 >
                   <X className="h-4 w-4" />
@@ -241,12 +245,10 @@ const SignUp = () => {
                   <Clock className="h-10 w-10" />
                 </div>
 
-                <h3 className="mt-5 text-2xl font-bold">
-                  {lawyerPendingTitle}
-                </h3>
+                <h3 className="mt-5 text-2xl font-bold">{modalTitle}</h3>
 
                 <p className="mt-2 text-sm leading-6 text-cyan-50">
-                  {lawyerPendingDesc}
+                  {modalDescription}
                 </p>
               </div>
 
@@ -259,12 +261,28 @@ const SignUp = () => {
 
                     <div>
                       <p className="text-sm font-bold text-amber-900">
-                        {lang === "bn"
-                          ? "Admin Verification Pending"
-                          : "Admin Verification Pending"}
+                        Admin Verification Pending
                       </p>
                       <p className="mt-1 text-xs leading-5 text-amber-800">
-                        {lawyerPendingNote}
+                        {modalNotice}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="flex gap-3">
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-bold text-emerald-900">
+                        Account request submitted
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-emerald-800">
+                        Your information has been sent to admin for manual
+                        verification.
                       </p>
                     </div>
                   </div>
@@ -273,7 +291,7 @@ const SignUp = () => {
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <button
                     type="button"
-                    onClick={() => setShowLawyerPendingModal(false)}
+                    onClick={() => setShowVerificationModal(false)}
                     className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                   >
                     {closeText}
@@ -281,7 +299,7 @@ const SignUp = () => {
 
                   <button
                     type="button"
-                    onClick={handleLawyerModalLogin}
+                    onClick={handleGoToLogin}
                     className="flex-1 rounded-xl bg-cyan-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-100 transition hover:bg-cyan-700"
                   >
                     {goToLoginText}
@@ -438,8 +456,8 @@ const SignUp = () => {
                   <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
                   <p className="text-xs leading-5 text-amber-800">
                     {lang === "bn"
-                      ? "আইনজীবী হিসেবে registration করলে admin verification শেষ হওয়ার পর login করা যাবে।"
-                      : "Lawyer accounts require admin verification before login."}
+                      ? "আইনজীবী হিসেবে registration করলে account admin verification এর অধীনে থাকবে। Verification complete হলে login করতে পারবেন।"
+                      : "Lawyer accounts will stay under admin verification after registration. You can login after verification is completed."}
                   </p>
                 </div>
               </div>
@@ -570,6 +588,7 @@ const SignUp = () => {
 
                 <div className="relative">
                   <Lock className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+
                   <input
                     type={showPassword ? "text" : "password"}
                     name="password"
@@ -601,6 +620,7 @@ const SignUp = () => {
 
                 <div className="relative">
                   <Lock className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     name="confirmPassword"
