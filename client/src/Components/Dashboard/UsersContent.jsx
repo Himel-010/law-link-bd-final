@@ -14,6 +14,9 @@ import {
   FiCheckCircle,
   FiAlertTriangle,
   FiPlus,
+  FiCheck,
+  FiClock,
+  FiShield,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -26,8 +29,9 @@ const initialEditForm = {
   nid: "",
   lawRegNumber: "",
   role: "client",
-  subscriptionStatus: "inactive",
+  subscriptionStatus: "none",
   phoneVerified: false,
+  lawyerVerificationStatus: "not_required",
   password: "",
 };
 
@@ -99,7 +103,33 @@ const getStatusBadgeClass = (status) => {
   if (status === "expired") {
     return "bg-rose-50 text-rose-700 ring-1 ring-rose-100";
   }
+  if (status === "cancelled") {
+    return "bg-rose-50 text-rose-700 ring-1 ring-rose-100";
+  }
   return "bg-slate-100 text-slate-600 ring-1 ring-slate-200";
+};
+
+const getLawyerVerificationBadgeClass = (status) => {
+  if (status === "verified") {
+    return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100";
+  }
+
+  if (status === "pending") {
+    return "bg-amber-50 text-amber-700 ring-1 ring-amber-100";
+  }
+
+  if (status === "rejected") {
+    return "bg-rose-50 text-rose-700 ring-1 ring-rose-100";
+  }
+
+  return "bg-slate-100 text-slate-600 ring-1 ring-slate-200";
+};
+
+const getLawyerVerificationLabel = (status) => {
+  if (status === "verified") return "Verified";
+  if (status === "pending") return "Pending";
+  if (status === "rejected") return "Rejected";
+  return "N/A";
 };
 
 const UserAvatar = ({ user }) => (
@@ -337,7 +367,8 @@ const EditUserModal = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-2xl border border-slate-200 p-3 text-slate-600 transition hover:bg-slate-50"
+                disabled={submitting}
+                className="rounded-2xl border border-slate-200 p-3 text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
               >
                 <FiX />
               </button>
@@ -381,21 +412,36 @@ const EditUserModal = ({
                   <option value="admin">Admin</option>
                 </select>
 
-                <input
-                  name="nid"
-                  value={form.nid}
-                  onChange={handleChange}
-                  className={inputClass}
-                  placeholder="NID"
-                />
+                {form.role === "lawyer" && (
+                  <>
+                    <input
+                      name="nid"
+                      value={form.nid}
+                      onChange={handleChange}
+                      className={inputClass}
+                      placeholder="NID"
+                    />
 
-                <input
-                  name="lawRegNumber"
-                  value={form.lawRegNumber}
-                  onChange={handleChange}
-                  className={inputClass}
-                  placeholder="Lawyer Registration"
-                />
+                    <input
+                      name="lawRegNumber"
+                      value={form.lawRegNumber}
+                      onChange={handleChange}
+                      className={inputClass}
+                      placeholder="Lawyer Registration"
+                    />
+
+                    <select
+                      name="lawyerVerificationStatus"
+                      value={form.lawyerVerificationStatus}
+                      onChange={handleChange}
+                      className={inputClass}
+                    >
+                      <option value="pending">Pending Verification</option>
+                      <option value="verified">Verified</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </>
+                )}
 
                 <select
                   name="subscriptionStatus"
@@ -403,10 +449,11 @@ const EditUserModal = ({
                   onChange={handleChange}
                   className={inputClass}
                 >
-                  <option value="inactive">Inactive</option>
+                  <option value="none">None</option>
                   <option value="active">Active</option>
                   <option value="pending">Pending</option>
                   <option value="expired">Expired</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
 
                 <input
@@ -435,7 +482,8 @@ const EditUserModal = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200"
+                  disabled={submitting}
+                  className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
                 >
                   Cancel
                 </button>
@@ -493,7 +541,7 @@ const DeleteConfirmModal = ({ isOpen, user, onClose, onConfirm, deleting }) => (
               type="button"
               onClick={onClose}
               disabled={deleting}
-              className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200"
+              className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
             >
               Cancel
             </button>
@@ -527,6 +575,7 @@ const UsersContent = () => {
 
   const [roleFilter, setRoleFilter] = useState("all");
   const [subscriptionFilter, setSubscriptionFilter] = useState("all");
+  const [verificationFilter, setVerificationFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -534,6 +583,7 @@ const UsersContent = () => {
   const [submitting, setSubmitting] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState("");
+  const [verifyingId, setVerifyingId] = useState("");
 
   const [editingUserId, setEditingUserId] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -558,6 +608,9 @@ const UsersContent = () => {
       total: users.length,
       clients: users.filter((u) => u.role === "client").length,
       lawyers: users.filter((u) => u.role === "lawyer").length,
+      pendingLawyers: users.filter(
+        (u) => u.role === "lawyer" && u.lawyerVerificationStatus === "pending"
+      ).length,
       active: users.filter((u) => u.subscriptionStatus === "active").length,
     }),
     [users]
@@ -572,11 +625,14 @@ const UsersContent = () => {
       if (subscriptionFilter !== "all") {
         params.subscriptionStatus = subscriptionFilter;
       }
+      if (verificationFilter !== "all") {
+        params.lawyerVerificationStatus = verificationFilter;
+      }
       if (searchTerm.trim()) params.search = searchTerm.trim();
 
       return params;
     },
-    [roleFilter, subscriptionFilter, searchTerm]
+    [roleFilter, subscriptionFilter, verificationFilter, searchTerm]
   );
 
   const fetchUsers = useCallback(
@@ -623,7 +679,15 @@ const UsersContent = () => {
     }, 450);
 
     return () => clearTimeout(delaySearch);
-  }, [searchTerm, roleFilter, subscriptionFilter, token, isAdmin, fetchUsers]);
+  }, [
+    searchTerm,
+    roleFilter,
+    subscriptionFilter,
+    verificationFilter,
+    token,
+    isAdmin,
+    fetchUsers,
+  ]);
 
   const handleRefresh = () => {
     fetchUsers({ append: false });
@@ -711,7 +775,11 @@ const UsersContent = () => {
         },
       });
 
-      toast.success("User created successfully");
+      toast.success(
+        createForm.role === "lawyer"
+          ? "Lawyer created. Verification is pending."
+          : "User created successfully"
+      );
       closeCreateModal();
       fetchUsers({ append: false });
     } catch (err) {
@@ -731,8 +799,12 @@ const UsersContent = () => {
       nid: user.nid || "",
       lawRegNumber: user.lawRegNumber || "",
       role: user.role || "client",
-      subscriptionStatus: user.subscriptionStatus || "inactive",
+      subscriptionStatus: user.subscriptionStatus || "none",
       phoneVerified: Boolean(user.phoneVerified),
+      lawyerVerificationStatus:
+        user.role === "lawyer"
+          ? user.lawyerVerificationStatus || "pending"
+          : "not_required",
       password: "",
     });
 
@@ -749,6 +821,12 @@ const UsersContent = () => {
     if (!form.name.trim()) return "Name is required";
     if (!form.email.trim()) return "Email is required";
     if (!form.role) return "Role is required";
+
+    if (form.role === "lawyer") {
+      if (!form.nid.trim()) return "NID is required";
+      if (!form.lawRegNumber.trim()) return "Lawyer registration is required";
+    }
+
     return "";
   };
 
@@ -757,14 +835,23 @@ const UsersContent = () => {
       name: form.name.trim(),
       email: form.email.trim().toLowerCase(),
       phone: form.phone.trim(),
-      nid: form.nid.trim(),
-      lawRegNumber: form.lawRegNumber.trim(),
       role: form.role,
       subscriptionStatus: form.subscriptionStatus,
-      phoneVerified: Boolean(form.phoneVerified),
+      phoneVerified: form.phoneVerified ? 1 : 0,
     };
 
+    if (form.role === "lawyer") {
+      payload.nid = form.nid.trim();
+      payload.lawRegNumber = form.lawRegNumber.trim();
+      payload.lawyerVerificationStatus = form.lawyerVerificationStatus;
+    } else {
+      payload.nid = "";
+      payload.lawRegNumber = "";
+      payload.lawyerVerificationStatus = "not_required";
+    }
+
     if (form.password.trim()) payload.password = form.password;
+
     return payload;
   };
 
@@ -791,6 +878,57 @@ const UsersContent = () => {
       toast.error(err?.response?.data?.message || "Failed to update user");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleVerifyLawyer = async (user) => {
+    const userId = getUserId(user);
+
+    if (!userId) return toast.error("Lawyer not found");
+
+    if (user.role !== "lawyer") {
+      return toast.error("Only lawyer accounts can be verified");
+    }
+
+    if (user.lawyerVerificationStatus === "verified") {
+      return toast.success("Lawyer is already verified");
+    }
+
+    try {
+      setVerifyingId(userId);
+
+      const res = await axios.patch(
+        `${API_BASE_URL}/users/lawyers/${userId}/verify`,
+        {
+          status: "verified",
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const updatedUser = res.data?.data;
+
+      setUsers((prev) =>
+        prev.map((item) => {
+          if (getUserId(item) !== userId) return item;
+
+          return {
+            ...item,
+            ...(updatedUser || {}),
+            lawyerVerificationStatus: "verified",
+          };
+        })
+      );
+
+      toast.success("Lawyer verified successfully");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to verify lawyer");
+    } finally {
+      setVerifyingId("");
     }
   };
 
@@ -883,7 +1021,8 @@ const UsersContent = () => {
                   Users Management
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                  Create, search, filter, edit, and manage all user accounts from one clean panel.
+                  Create, search, filter, edit, verify lawyers, and manage all
+                  user accounts from one clean panel.
                 </p>
               </div>
 
@@ -909,7 +1048,7 @@ const UsersContent = () => {
               </div>
             </div>
 
-            <div className="mt-8 grid gap-3 lg:grid-cols-[1fr_170px_190px]">
+            <div className="mt-8 grid gap-3 xl:grid-cols-[1fr_160px_180px_210px]">
               <div className="relative">
                 <FiSearch className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
@@ -941,18 +1080,35 @@ const UsersContent = () => {
                 className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-bold text-slate-700 outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
               >
                 <option value="all">All Plans</option>
+                <option value="none">None</option>
                 <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
                 <option value="pending">Pending</option>
                 <option value="expired">Expired</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+
+              <select
+                value={verificationFilter}
+                onChange={(e) => setVerificationFilter(e.target.value)}
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-bold text-slate-700 outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
+              >
+                <option value="all">All Lawyer Verification</option>
+                <option value="pending">Pending Lawyers</option>
+                <option value="verified">Verified Lawyers</option>
+                <option value="rejected">Rejected Lawyers</option>
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5">
             <StatCard title="Total Users" value={stats.total} icon={FiUsers} />
             <StatCard title="Clients" value={stats.clients} icon={FiUser} />
             <StatCard title="Lawyers" value={stats.lawyers} icon={FiBriefcase} />
+            <StatCard
+              title="Pending Lawyers"
+              value={stats.pendingLawyers}
+              icon={FiClock}
+            />
             <StatCard title="Active Plans" value={stats.active} icon={FiCheckCircle} />
           </div>
 
@@ -982,7 +1138,7 @@ const UsersContent = () => {
               </div>
             ) : (
               <>
-                <div className="hidden overflow-x-auto lg:block">
+                <div className="hidden overflow-x-auto xl:block">
                   <table className="min-w-full border-separate border-spacing-y-3">
                     <thead>
                       <tr className="text-left text-sm text-slate-500">
@@ -990,7 +1146,8 @@ const UsersContent = () => {
                         <th className="px-4">Phone</th>
                         <th className="px-4">Role</th>
                         <th className="px-4">Plan</th>
-                        <th className="px-4">Verified</th>
+                        <th className="px-4">Lawyer Verification</th>
+                        <th className="px-4">Phone Verified</th>
                         <th className="px-4 text-right">Actions</th>
                       </tr>
                     </thead>
@@ -998,6 +1155,9 @@ const UsersContent = () => {
                     <tbody>
                       {users.map((user) => {
                         const userId = getUserId(user);
+                        const isLawyer = user.role === "lawyer";
+                        const isLawyerVerified =
+                          user.lawyerVerificationStatus === "verified";
 
                         return (
                           <tr
@@ -1017,7 +1177,7 @@ const UsersContent = () => {
                                     {user.email}
                                   </p>
 
-                                  {user.role === "lawyer" && user.lawRegNumber && (
+                                  {isLawyer && user.lawRegNumber && (
                                     <p className="mt-1 text-xs font-semibold text-slate-400">
                                       Reg: {user.lawRegNumber}
                                     </p>
@@ -1046,8 +1206,27 @@ const UsersContent = () => {
                                   user.subscriptionStatus
                                 )}`}
                               >
-                                {user.subscriptionStatus || "inactive"}
+                                {user.subscriptionStatus || "none"}
                               </span>
+                            </td>
+
+                            <td className="px-4 py-4">
+                              {isLawyer ? (
+                                <span
+                                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${getLawyerVerificationBadgeClass(
+                                    user.lawyerVerificationStatus
+                                  )}`}
+                                >
+                                  {isLawyerVerified ? <FiCheck /> : <FiClock />}
+                                  {getLawyerVerificationLabel(
+                                    user.lawyerVerificationStatus
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500 ring-1 ring-slate-200">
+                                  N/A
+                                </span>
+                              )}
                             </td>
 
                             <td className="px-4 py-4">
@@ -1064,6 +1243,35 @@ const UsersContent = () => {
 
                             <td className="rounded-r-3xl px-4 py-4">
                               <div className="flex justify-end gap-2">
+                                {isLawyer && !isLawyerVerified && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleVerifyLawyer(user)}
+                                    disabled={verifyingId === userId}
+                                    title="Verify lawyer"
+                                    className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:bg-emerald-300"
+                                  >
+                                    {verifyingId === userId ? (
+                                      <FiLoader className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <FiCheck className="h-4 w-4" />
+                                    )}
+                                    Verify
+                                  </button>
+                                )}
+
+                                {isLawyer && isLawyerVerified && (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    title="Already verified"
+                                    className="inline-flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100"
+                                  >
+                                    <FiShield className="h-4 w-4" />
+                                    Verified
+                                  </button>
+                                )}
+
                                 <button
                                   type="button"
                                   onClick={() => openEditModal(user)}
@@ -1095,9 +1303,12 @@ const UsersContent = () => {
                   </table>
                 </div>
 
-                <div className="grid gap-4 lg:hidden">
+                <div className="grid gap-4 xl:hidden">
                   {users.map((user) => {
                     const userId = getUserId(user);
+                    const isLawyer = user.role === "lawyer";
+                    const isLawyerVerified =
+                      user.lawyerVerificationStatus === "verified";
 
                     return (
                       <div
@@ -1115,6 +1326,12 @@ const UsersContent = () => {
                             <p className="truncate text-sm text-slate-500">
                               {user.email}
                             </p>
+
+                            {isLawyer && user.lawRegNumber && (
+                              <p className="mt-1 text-xs font-semibold text-slate-400">
+                                Reg: {user.lawRegNumber}
+                              </p>
+                            )}
                           </div>
 
                           <span
@@ -1144,23 +1361,70 @@ const UsersContent = () => {
                           <div className="rounded-2xl bg-slate-50 px-3 py-2">
                             <p className="text-xs font-bold text-slate-500">Plan</p>
                             <p className="mt-1 text-sm font-black capitalize text-slate-800">
-                              {user.subscriptionStatus || "inactive"}
+                              {user.subscriptionStatus || "none"}
                             </p>
                           </div>
 
                           <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                            <p className="text-xs font-bold text-slate-500">Verified</p>
+                            <p className="text-xs font-bold text-slate-500">
+                              Phone Verified
+                            </p>
                             <p className="mt-1 text-sm font-black text-slate-800">
                               {user.phoneVerified ? "Yes" : "No"}
                             </p>
                           </div>
+
+                          {isLawyer && (
+                            <div className="col-span-2 rounded-2xl bg-slate-50 px-3 py-2">
+                              <p className="text-xs font-bold text-slate-500">
+                                Lawyer Verification
+                              </p>
+                              <span
+                                className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${getLawyerVerificationBadgeClass(
+                                  user.lawyerVerificationStatus
+                                )}`}
+                              >
+                                {isLawyerVerified ? <FiCheck /> : <FiClock />}
+                                {getLawyerVerificationLabel(
+                                  user.lawyerVerificationStatus
+                                )}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="mt-4 flex gap-2">
+                        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          {isLawyer && !isLawyerVerified && (
+                            <button
+                              type="button"
+                              onClick={() => handleVerifyLawyer(user)}
+                              disabled={verifyingId === userId}
+                              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white disabled:bg-emerald-300"
+                            >
+                              {verifyingId === userId ? (
+                                <FiLoader className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <FiCheck className="h-4 w-4" />
+                              )}
+                              Verify
+                            </button>
+                          )}
+
+                          {isLawyer && isLawyerVerified && (
+                            <button
+                              type="button"
+                              disabled
+                              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100"
+                            >
+                              <FiShield className="h-4 w-4" />
+                              Verified
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => openEditModal(user)}
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-3 py-2.5 text-sm font-bold text-white"
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-3 py-2.5 text-sm font-bold text-white"
                           >
                             <FiEdit2 className="h-4 w-4" />
                             Edit
@@ -1170,7 +1434,7 @@ const UsersContent = () => {
                             type="button"
                             onClick={() => openDeleteModal(user)}
                             disabled={deletingId === userId}
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-50 px-3 py-2.5 text-sm font-bold text-rose-600 disabled:opacity-60"
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-50 px-3 py-2.5 text-sm font-bold text-rose-600 disabled:opacity-60"
                           >
                             {deletingId === userId ? (
                               <FiLoader className="h-4 w-4 animate-spin" />
