@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Eye,
   EyeOff,
@@ -14,6 +14,9 @@ import {
   ArrowLeft,
   CreditCard,
   BadgeCheck,
+  Clock,
+  ShieldCheck,
+  X,
 } from "lucide-react"
 import { useSelector } from "react-redux"
 import data from "../../json/signup.json"
@@ -28,6 +31,7 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+  const [showLawyerPendingModal, setShowLawyerPendingModal] = useState(false)
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -43,7 +47,11 @@ const SignUp = () => {
   })
 
   const nidLabel = lang === "bn" ? "জাতীয় পরিচয়পত্র নম্বর" : "NID Number"
-  const regLabel = lang === "bn" ? "বার কাউন্সিল / আইন নিবন্ধন নম্বর" : "Law Registration Number"
+
+  const regLabel =
+    lang === "bn"
+      ? "বার কাউন্সিল / আইন নিবন্ধন নম্বর"
+      : "Law Registration Number"
 
   const passwordMismatchText =
     lang === "bn" ? "পাসওয়ার্ড মিলছে না" : "Passwords don't match!"
@@ -63,6 +71,45 @@ const SignUp = () => {
 
   const creatingAccountText =
     lang === "bn" ? "একাউন্ট তৈরি হচ্ছে..." : "Creating Account..."
+
+  const lawyerPendingTitle =
+    lang === "bn"
+      ? "আপনার আইনজীবী একাউন্ট তৈরি হয়েছে"
+      : "Your lawyer account has been created"
+
+  const lawyerPendingDesc =
+    lang === "bn"
+      ? "আপনার একাউন্টটি এখন admin verification এর জন্য pending আছে। Admin verify করার পর আপনি login করতে পারবেন।"
+      : "Your account is now pending admin verification. You can login after the admin verifies your lawyer account."
+
+  const lawyerPendingNote =
+    lang === "bn"
+      ? "অনুগ্রহ করে verification শেষ হওয়া পর্যন্ত অপেক্ষা করুন।"
+      : "Please wait until the verification is completed."
+
+  const goToLoginText = lang === "bn" ? "Sign In পেজে যান" : "Go to Sign In"
+
+  const closeText = lang === "bn" ? "বন্ধ করুন" : "Close"
+
+  const resetForm = () => {
+    setFormData({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+      userType: "client",
+      nid: "",
+      lawRegNumber: "",
+      agreeToTerms: false,
+    })
+  }
+
+  const handleLawyerModalLogin = () => {
+    setShowLawyerPendingModal(false)
+    navigate("/sign-in")
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -101,17 +148,17 @@ const SignUp = () => {
         formData.userType === "lawyer"
           ? {
               name: fullName,
-              email: formData.email,
-              nid: formData.nid,
-              lawRegNumber: formData.lawRegNumber,
-              phone: formData.phone,
+              email: formData.email.trim().toLowerCase(),
+              nid: formData.nid.trim(),
+              lawRegNumber: formData.lawRegNumber.trim(),
+              phone: formData.phone.trim(),
               phoneVerified: 0,
               password: formData.password,
             }
           : {
               name: fullName,
-              email: formData.email,
-              phone: formData.phone,
+              email: formData.email.trim().toLowerCase(),
+              phone: formData.phone.trim(),
               password: formData.password,
             }
 
@@ -130,23 +177,17 @@ const SignUp = () => {
         return
       }
 
+      resetForm()
+
+      if (formData.userType === "lawyer") {
+        setShowLawyerPendingModal(true)
+        return
+      }
+
       setSuccessMessage(
         result.message ||
           (lang === "bn" ? "রেজিস্ট্রেশন সফল হয়েছে" : "Registration successful")
       )
-
-      setFormData({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        password: "",
-        confirmPassword: "",
-        userType: "client",
-        nid: "",
-        lawRegNumber: "",
-        agreeToTerms: false,
-      })
 
       setTimeout(() => {
         navigate("/sign-in")
@@ -160,14 +201,98 @@ const SignUp = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }))
+
+    if (errorMessage) setErrorMessage("")
+    if (successMessage) setSuccessMessage("")
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-amber-50 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
+      <AnimatePresence>
+        {showLawyerPendingModal && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+              initial={{ opacity: 0, y: 30, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 30, scale: 0.96 }}
+              transition={{ type: "spring", stiffness: 220, damping: 22 }}
+            >
+              <div className="relative bg-gradient-to-br from-cyan-600 to-cyan-700 px-6 py-8 text-center text-white">
+                <button
+                  type="button"
+                  onClick={() => setShowLawyerPendingModal(false)}
+                  className="absolute right-4 top-4 rounded-full bg-white/15 p-2 text-white transition hover:bg-white/25"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 ring-8 ring-white/10">
+                  <Clock className="h-10 w-10" />
+                </div>
+
+                <h3 className="mt-5 text-2xl font-bold">
+                  {lawyerPendingTitle}
+                </h3>
+
+                <p className="mt-2 text-sm leading-6 text-cyan-50">
+                  {lawyerPendingDesc}
+                </p>
+              </div>
+
+              <div className="space-y-4 p-6">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex gap-3">
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                      <ShieldCheck className="h-5 w-5" />
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-bold text-amber-900">
+                        {lang === "bn"
+                          ? "Admin Verification Pending"
+                          : "Admin Verification Pending"}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-amber-800">
+                        {lawyerPendingNote}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => setShowLawyerPendingModal(false)}
+                    className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    {closeText}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleLawyerModalLogin}
+                    className="flex-1 rounded-xl bg-cyan-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-100 transition hover:bg-cyan-700"
+                  >
+                    {goToLoginText}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-6xl w-full grid lg:grid-cols-2 gap-8 items-center">
         <motion.div
           className="hidden lg:block"
@@ -189,6 +314,7 @@ const SignUp = () => {
             <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
               {t.joinTitle}
             </h2>
+
             <p className="text-lg text-gray-600 mb-8">{t.joinDesc}</p>
 
             <div className="space-y-4">
@@ -240,9 +366,11 @@ const SignUp = () => {
               <Scale className="w-8 h-8 text-cyan-600" />
               <h1 className="text-2xl font-bold text-gray-900">LegalAid</h1>
             </motion.div>
+
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               {t.createAccount}
             </h2>
+
             <p className="text-gray-600">{t.fillDetails}</p>
           </div>
 
@@ -276,6 +404,7 @@ const SignUp = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t.accountType}
               </label>
+
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex items-center gap-2 p-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                   <input
@@ -303,11 +432,25 @@ const SignUp = () => {
               </div>
             </div>
 
+            {formData.userType === "lawyer" && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                  <p className="text-xs leading-5 text-amber-800">
+                    {lang === "bn"
+                      ? "আইনজীবী হিসেবে registration করলে admin verification শেষ হওয়ার পর login করা যাবে।"
+                      : "Lawyer accounts require admin verification before login."}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   {t.firstName}
                 </label>
+
                 <div className="relative">
                   <User className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
@@ -326,6 +469,7 @@ const SignUp = () => {
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   {t.lastName}
                 </label>
+
                 <input
                   type="text"
                   name="lastName"
@@ -342,6 +486,7 @@ const SignUp = () => {
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 {t.email}
               </label>
+
               <div className="relative">
                 <Mail className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -360,6 +505,7 @@ const SignUp = () => {
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 {t.phone}
               </label>
+
               <div className="relative">
                 <Phone className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -380,6 +526,7 @@ const SignUp = () => {
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     {nidLabel}
                   </label>
+
                   <div className="relative">
                     <CreditCard className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
@@ -398,6 +545,7 @@ const SignUp = () => {
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     {regLabel}
                   </label>
+
                   <div className="relative">
                     <BadgeCheck className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
@@ -419,6 +567,7 @@ const SignUp = () => {
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   {t.password}
                 </label>
+
                 <div className="relative">
                   <Lock className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
@@ -430,6 +579,7 @@ const SignUp = () => {
                     placeholder={t.password}
                     required
                   />
+
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
@@ -448,6 +598,7 @@ const SignUp = () => {
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   {t.confirmPassword}
                 </label>
+
                 <div className="relative">
                   <Lock className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
@@ -459,6 +610,7 @@ const SignUp = () => {
                     placeholder={t.confirmPassword}
                     required
                   />
+
                   <button
                     type="button"
                     onClick={() =>
@@ -486,6 +638,7 @@ const SignUp = () => {
                   className="w-4 h-4 text-cyan-600 border-gray-300 rounded focus:ring-cyan-500 mt-0.5"
                   required
                 />
+
                 <span className="text-xs text-gray-600">
                   {t.agree}{" "}
                   <button
@@ -524,6 +677,7 @@ const SignUp = () => {
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300"></div>
               </div>
+
               <div className="relative flex justify-center text-xs">
                 <span className="px-2 bg-white text-gray-500">
                   {t.orContinue}
